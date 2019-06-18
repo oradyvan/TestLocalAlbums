@@ -7,14 +7,18 @@
 //
 
 import UIKit
+import Photos
 
 class ViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view.
+
+        if PHPhotoLibrary.authorizationStatus() != .authorized {
+            PHPhotoLibrary.requestAuthorization { status in
+                debugPrint("status = \(status)")
+            }
+        }
     }
-
-
 }
 
