@@ -13,11 +13,13 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
     var topLevelCollections = [PHCollection]()
     var albums = [PHAssetCollection]()
     var moments = [PHAssetCollection]()
+    var smartAlbums = [PHAssetCollection]()
 
     func refresh() {
         refreshTopLevelCollections()
         refreshAlbums()
         refreshMoments()
+        refreshSmartAlbums()
     }
 
     private func refreshTopLevelCollections() {
@@ -62,6 +64,20 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
         }
     }
 
+    private func refreshSmartAlbums() {
+        smartAlbums.removeAll()
+
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.includeHiddenAssets = true
+        fetchOptions.includeAllBurstAssets = true
+        fetchOptions.wantsIncrementalChangeDetails = false
+
+        let result = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .any, options: fetchOptions)
+        result.enumerateObjects { [weak self] assetCollection, index, _ in
+            self?.smartAlbums.append(assetCollection)
+        }
+    }
+
     // MARK: - Table view data source
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "AlbumCell", for: indexPath)
@@ -74,6 +90,8 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
             configureAssetCollectionCell(cell, from: albums, at: indexPath)
         case 2:
             configureAssetCollectionCell(cell, from: moments, at: indexPath)
+        case 3:
+            configureAssetCollectionCell(cell, from: smartAlbums, at: indexPath)
         default:
             ()
         }
@@ -89,10 +107,15 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
     private func configureAssetCollectionCell(_ cell: UITableViewCell, from collection: [PHAssetCollection], at indexPath: IndexPath) {
         let assetCollection = collection[indexPath.row]
         cell.textLabel?.text = assetCollection.localizedTitle ?? "N/A"
+        if assetCollection.estimatedAssetCount != NSNotFound {
+            cell.detailTextLabel?.text = "\(assetCollection.estimatedAssetCount) items"
+        } else {
+            cell.detailTextLabel?.text = nil
+        }
     }
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 3
+        return 4
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -103,6 +126,8 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
             return albums.count
         case 2:
             return moments.count
+        case 3:
+            return smartAlbums.count
         default:
             return 0
         }
@@ -116,6 +141,8 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
             return "Albums"
         case 2:
             return "Moments"
+        case 3:
+            return "Smart Albums"
         default:
             return nil
         }
