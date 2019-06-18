@@ -12,10 +12,12 @@ import Photos
 class AlbumsDataSource: NSObject, UITableViewDataSource {
     var topLevelCollections = [PHCollection]()
     var albums = [PHAssetCollection]()
+    var moments = [PHAssetCollection]()
 
     func refresh() {
         refreshTopLevelCollections()
         refreshAlbums()
+        refreshMoments()
     }
 
     private func refreshTopLevelCollections() {
@@ -46,6 +48,20 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
         }
     }
 
+    private func refreshMoments() {
+        moments.removeAll()
+
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.includeHiddenAssets = true
+        fetchOptions.includeAllBurstAssets = true
+        fetchOptions.wantsIncrementalChangeDetails = false
+
+        let result = PHAssetCollection.fetchAssetCollections(with: .moment, subtype: .any, options: fetchOptions)
+        result.enumerateObjects { [weak self] assetCollection, index, _ in
+            self?.moments.append(assetCollection)
+        }
+    }
+
     // MARK: - Table view data source
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "AlbumCell", for: indexPath)
@@ -55,7 +71,9 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
         case 0:
             configureCollectionCell(cell, at: indexPath)
         case 1:
-            configureAlbumCell(cell, at: indexPath)
+            configureAssetCollectionCell(cell, from: albums, at: indexPath)
+        case 2:
+            configureAssetCollectionCell(cell, from: moments, at: indexPath)
         default:
             ()
         }
@@ -68,13 +86,13 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
         cell.textLabel?.text = collection.localizedTitle ?? "N/A"
     }
 
-    private func configureAlbumCell(_ cell: UITableViewCell, at indexPath: IndexPath) {
-        let album = albums[indexPath.row]
-        cell.textLabel?.text = album.localizedTitle ?? "N/A"
+    private func configureAssetCollectionCell(_ cell: UITableViewCell, from collection: [PHAssetCollection], at indexPath: IndexPath) {
+        let assetCollection = collection[indexPath.row]
+        cell.textLabel?.text = assetCollection.localizedTitle ?? "N/A"
     }
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 2
+        return 3
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -83,6 +101,8 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
             return topLevelCollections.count
         case 1:
             return albums.count
+        case 2:
+            return moments.count
         default:
             return 0
         }
@@ -94,6 +114,8 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
             return "Top Level Collections"
         case 1:
             return "Albums"
+        case 2:
+            return "Moments"
         default:
             return nil
         }
