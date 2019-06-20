@@ -9,38 +9,49 @@
 import UIKit
 import Photos
 
+struct AssetCollectionInfoSection {
+    let title: String
+    let infoList: [AssetCollectionInfo]
+}
+
 struct AssetCollectionInfo {
     let collectionName: String
     let assetCount: Int
 }
 
 class AlbumsDataSource: NSObject, UITableViewDataSource {
-    var topLevelCollections = [AssetCollectionInfo]()
-    var albums = [AssetCollectionInfo]()
-    var moments = [AssetCollectionInfo]()
-    var smartAlbums = [AssetCollectionInfo]()
+    var sections = [AssetCollectionInfoSection]()
 
     func refresh(completion: @escaping () -> Void) {
         let group = DispatchGroup()
-        topLevelCollections.removeAll()
-        refreshTopLevelCollections(group: group, infoBlock: { [weak self] info in
-            self?.topLevelCollections.append(info)
+        sections.removeAll()
+        var topLevelCollections = [AssetCollectionInfo]()
+        refreshTopLevelCollections(group: group, infoBlock: { info in
+            topLevelCollections.append(info)
         })
+        sections.append(AssetCollectionInfoSection(title: "Top Level Collections",
+                                                   infoList: topLevelCollections))
 
-        albums.removeAll()
-        refreshAssetCollection(of: .album, infoBlock: { [weak self] info in
-            self?.albums.append(info)
+        var albums = [AssetCollectionInfo]()
+        refreshAssetCollection(of: .album, infoBlock: { info in
+            albums.append(info)
         }, group: group)
+        sections.append(AssetCollectionInfoSection(title: "Albums",
+                                                   infoList: albums))
 
-        moments.removeAll()
-        refreshAssetCollection(of: .moment, infoBlock: { [weak self] info in
-            self?.moments.append(info)
+        var smartAlbums = [AssetCollectionInfo]()
+        refreshAssetCollection(of: .smartAlbum, infoBlock: { info in
+            smartAlbums.append(info)
         }, group: group)
+        sections.append(AssetCollectionInfoSection(title: "Smart Albums",
+                                                   infoList: smartAlbums))
 
-        smartAlbums.removeAll()
-        refreshAssetCollection(of: .smartAlbum, infoBlock: { [weak self] info in
-            self?.smartAlbums.append(info)
+        var moments = [AssetCollectionInfo]()
+        refreshAssetCollection(of: .moment, infoBlock: { info in
+            moments.append(info)
         }, group: group)
+        sections.append(AssetCollectionInfoSection(title: "Moments (iOS 13 deprecated)",
+                                                   infoList: moments))
 
         group.notify(queue: .main) {
             completion()
@@ -94,19 +105,8 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
         let cell = tableView.dequeueReusableCell(withIdentifier: "AlbumCell", for: indexPath)
 
         // Configure the cell...
-        switch indexPath.section {
-        case 0:
-            configureAssetCollectionCell(cell, from: topLevelCollections, at: indexPath)
-        case 1:
-            configureAssetCollectionCell(cell, from: albums, at: indexPath)
-        case 2:
-            configureAssetCollectionCell(cell, from: moments, at: indexPath)
-        case 3:
-            configureAssetCollectionCell(cell, from: smartAlbums, at: indexPath)
-        default:
-            ()
-        }
-
+        let section = sections[indexPath.section]
+        configureAssetCollectionCell(cell, from: section.infoList, at: indexPath)
         return cell
     }
 
@@ -123,36 +123,16 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
     }
 
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 4
+        return sections.count
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch section {
-        case 0:
-            return topLevelCollections.count
-        case 1:
-            return albums.count
-        case 2:
-            return moments.count
-        case 3:
-            return smartAlbums.count
-        default:
-            return 0
-        }
+        let data = sections[section]
+        return data.infoList.count
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        switch section {
-        case 0:
-            return "Top Level Collections"
-        case 1:
-            return "Albums"
-        case 2:
-            return "Moments"
-        case 3:
-            return "Smart Albums"
-        default:
-            return nil
-        }
+        let data = sections[section]
+        return data.title
     }
 }
