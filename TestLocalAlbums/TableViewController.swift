@@ -14,11 +14,8 @@ class TableViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         tableView.dataSource = albumsDataSource
-        albumsDataSource.refresh()
-    }
-
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        tableView.reloadData()
+        albumsDataSource.refresh { [weak self] in
+            self?.tableView.reloadData()
+        }
     }
 }

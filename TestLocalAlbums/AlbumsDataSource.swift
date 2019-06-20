@@ -9,72 +9,83 @@
 import UIKit
 import Photos
 
-class AlbumsDataSource: NSObject, UITableViewDataSource {
-    var topLevelCollections = [PHCollection]()
-    var albums = [PHAssetCollection]()
-    var moments = [PHAssetCollection]()
-    var smartAlbums = [PHAssetCollection]()
+struct AssetCollectionInfo {
+    let collectionName: String
+    let assetCount: Int
+}
 
-    func refresh() {
-        refreshTopLevelCollections()
-        refreshAlbums()
-        refreshMoments()
-        refreshSmartAlbums()
+class AlbumsDataSource: NSObject, UITableViewDataSource {
+    var topLevelCollections = [AssetCollectionInfo]()
+    var albums = [AssetCollectionInfo]()
+    var moments = [AssetCollectionInfo]()
+    var smartAlbums = [AssetCollectionInfo]()
+
+    func refresh(completion: @escaping () -> Void) {
+        let group = DispatchGroup()
+        topLevelCollections.removeAll()
+        refreshTopLevelCollections(group: group, infoBlock: { [weak self] info in
+            self?.topLevelCollections.append(info)
+        })
+
+        albums.removeAll()
+        refreshAssetCollection(of: .album, infoBlock: { [weak self] info in
+            self?.albums.append(info)
+        }, group: group)
+
+        moments.removeAll()
+        refreshAssetCollection(of: .moment, infoBlock: { [weak self] info in
+            self?.moments.append(info)
+        }, group: group)
+
+        smartAlbums.removeAll()
+        refreshAssetCollection(of: .smartAlbum, infoBlock: { [weak self] info in
+            self?.smartAlbums.append(info)
+        }, group: group)
+
+        group.notify(queue: .main) {
+            completion()
+        }
     }
 
-    private func refreshTopLevelCollections() {
-        topLevelCollections.removeAll()
-
+    private func refreshTopLevelCollections(group: DispatchGroup,
+                                            infoBlock: @escaping (AssetCollectionInfo) -> Void) {
+        group.enter()
         let fetchOptions = PHFetchOptions()
         fetchOptions.includeHiddenAssets = true
         fetchOptions.includeAllBurstAssets = true
         fetchOptions.wantsIncrementalChangeDetails = false
 
         let collections = PHCollection.fetchTopLevelUserCollections(with: fetchOptions)
-        collections.enumerateObjects { [weak self] collection, index, _ in
-            self?.topLevelCollections.append(collection)
+        let count = collections.count
+        collections.enumerateObjects { collection, index, _ in
+            let info = AssetCollectionInfo(collectionName: collection.localizedTitle ?? "N/A",
+                                           assetCount: NSNotFound)
+            infoBlock(info)
+            if index == count - 1 {
+                group.leave()
+            }
         }
     }
 
-    private func refreshAlbums() {
-        albums.removeAll()
-
+    private func refreshAssetCollection(of type: PHAssetCollectionType,
+                                        infoBlock: @escaping (AssetCollectionInfo) -> Void,
+                                        group: DispatchGroup)  {
+        group.enter()
         let fetchOptions = PHFetchOptions()
         fetchOptions.includeHiddenAssets = true
         fetchOptions.includeAllBurstAssets = true
         fetchOptions.wantsIncrementalChangeDetails = false
 
-        let result = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: fetchOptions)
-        result.enumerateObjects { [weak self] assetCollection, index, _ in
-            self?.albums.append(assetCollection)
-        }
-    }
-
-    private func refreshMoments() {
-        moments.removeAll()
-
-        let fetchOptions = PHFetchOptions()
-        fetchOptions.includeHiddenAssets = true
-        fetchOptions.includeAllBurstAssets = true
-        fetchOptions.wantsIncrementalChangeDetails = false
-
-        let result = PHAssetCollection.fetchAssetCollections(with: .moment, subtype: .any, options: fetchOptions)
-        result.enumerateObjects { [weak self] assetCollection, index, _ in
-            self?.moments.append(assetCollection)
-        }
-    }
-
-    private func refreshSmartAlbums() {
-        smartAlbums.removeAll()
-
-        let fetchOptions = PHFetchOptions()
-        fetchOptions.includeHiddenAssets = true
-        fetchOptions.includeAllBurstAssets = true
-        fetchOptions.wantsIncrementalChangeDetails = false
-
-        let result = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .any, options: fetchOptions)
-        result.enumerateObjects { [weak self] assetCollection, index, _ in
-            self?.smartAlbums.append(assetCollection)
+        let collections = PHAssetCollection.fetchAssetCollections(with: type, subtype: .any, options: fetchOptions)
+        let count = collections.count
+        collections.enumerateObjects { assetCollection, index, _ in
+            let assets = PHAsset.fetchAssets(in: assetCollection, options: fetchOptions)
+            let info = AssetCollectionInfo(collectionName: assetCollection.localizedTitle ?? "N/A",
+                                           assetCount: assets.count)
+            infoBlock(info)
+            if index == count - 1 {
+                group.leave()
+            }
         }
     }
 
@@ -85,7 +96,7 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
         // Configure the cell...
         switch indexPath.section {
         case 0:
-            configureCollectionCell(cell, at: indexPath)
+            configureAssetCollectionCell(cell, from: topLevelCollections, at: indexPath)
         case 1:
             configureAssetCollectionCell(cell, from: albums, at: indexPath)
         case 2:
@@ -99,16 +110,13 @@ class AlbumsDataSource: NSObject, UITableViewDataSource {
         return cell
     }
 
-    private func configureCollectionCell(_ cell: UITableViewCell, at indexPath: IndexPath) {
-        let collection = topLevelCollections[indexPath.row]
-        cell.textLabel?.text = collection.localizedTitle ?? "N/A"
-    }
-
-    private func configureAssetCollectionCell(_ cell: UITableViewCell, from collection: [PHAssetCollection], at indexPath: IndexPath) {
-        let assetCollection = collection[indexPath.row]
-        cell.textLabel?.text = assetCollection.localizedTitle ?? "N/A"
-        if assetCollection.estimatedAssetCount != NSNotFound {
-            cell.detailTextLabel?.text = "\(assetCollection.estimatedAssetCount) items"
+    private func configureAssetCollectionCell(_ cell: UITableViewCell,
+                                              from collectionInfo: [AssetCollectionInfo],
+                                              at indexPath: IndexPath) {
+        let info = collectionInfo[indexPath.row]
+        cell.textLabel?.text = info.collectionName
+        if info.assetCount != NSNotFound {
+            cell.detailTextLabel?.text = "\(info.assetCount) items"
         } else {
             cell.detailTextLabel?.text = nil
         }
